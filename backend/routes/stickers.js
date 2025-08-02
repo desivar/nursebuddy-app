@@ -1,40 +1,55 @@
-// backend/routes/stickers.js
+// backend/models/Sticker.js
 
-const express = require('express');
-const router = express.Router();
-const auth = require('../middleware/auth');
-const Sticker = require('../models/Sticker');
+const mongoose = require('mongoose'); // ✅ This was missing!
 
-// 🎯 GET /api/stickers
-// Get all stickers (or just earned ones)
-router.get('/', auth, async (req, res) => {
-  try {
-    const stickers = await Sticker.find({});
-    res.json(stickers);
-  } catch (err) {
-    console.error(err.message);
-    res.status(500).send('Server error');
-  }
-});
-
-// 🎉 POST /api/stickers/earn/:id
-// Mark a sticker as earned by the user
-router.post('/earn/:id', auth, async (req, res) => {
-  try {
-    const sticker = await Sticker.findById(req.params.id);
-    if (!sticker) return res.status(404).json({ msg: 'Sticker not found' });
-
-    const user = await require('../models/User').findById(req.user.id);
-    if (!user.stickers.includes(sticker._id)) {
-      user.stickers.push(sticker._id);
-      await user.save();
+const stickerSchema = new mongoose.Schema({
+  name: {
+    type: String,
+    required: true
+  },
+  image: {
+    type: String, // e.g., emoji like '💊' or URL
+    default: '🌟'
+  },
+  description: {
+    type: String
+  },
+  // Optional: track who earned it
+  earnedBy: [
+    {
+      type: mongoose.Schema.Types.ObjectId,
+      ref: 'User'
     }
-
-    res.json({ msg: 'Sticker earned!', sticker });
-  } catch (err) {
-    console.error(err.message);
-    res.status(500).send('Server error');
-  }
+  ]
 });
 
-module.exports = router;
+module.exports = mongoose.model('Sticker', stickerSchema);
+
+// --- ONLY FOR TESTING ---
+// Remove or disable in production
+router.get('/seed', async (req, res) => {
+  const stickerData = [
+    { name: 'Med Master', image: '💊', description: 'Gave meds on time!' },
+    { name: 'IV Hero', image: '💉', description: 'Fixed the drip!' },
+    { name: 'Heart Helper', image: '❤️‍🩹', description: 'Patient smiled today!' },
+    { name: 'Night Owl', image: '🦉', description: 'Survived the night shift!' },
+    { name: 'Hydration Hero', image: '💧', description: 'Drank 8 glasses!' },
+    { name: 'Compassion Star', image: '🌟', description: 'Made someone feel seen!' },
+    { name: 'Team Player', image: '🤝', description: 'Helped a coworker!' },
+    { name: 'Calm Captain', image: '⛵', description: 'Stayed cool under pressure!' }
+  ];
+
+  try {
+    // Clear existing stickers
+    await Sticker.deleteMany({});
+    // Insert new ones
+    await Sticker.insertMany(stickerData);
+    res.json({ 
+      msg: '✅ Stickers seeded successfully!', 
+      count: stickerData.length 
+    });
+  } catch (err) {
+    console.error('Seed error:', err);
+    res.status(500).json({ msg: 'Seed failed', error: err.message });
+  }
+});
